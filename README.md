@@ -4,6 +4,10 @@
 
 **Turn any web application into a deterministic, typed tool surface for autonomous AI agents — zero brittle DOM scraping, zero pixel guessing.**
 
+<p>
+  <img src="docs/assets/webmcp-adk-banner.jpg" alt="Browser-Native AI Agents with WebMCP and Google ADK Architecture" width="100%" />
+</p>
+
 [![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Google ADK](https://img.shields.io/badge/Google%20ADK-2.12%2B-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://adk.dev/)
 [![WebMCP](https://img.shields.io/badge/W3C%20WebMCP-navigator.modelContext-0EA5E9?style=for-the-badge&logo=googlechrome&logoColor=white)](#two-webmcp-surfaces-imperative--declarative)
@@ -281,6 +285,8 @@ webmcp-adk/
 │   ├── storefront.js         # Imperative tool registrations, UI highlights & ADK chat client
 │   ├── index.html            # NexusGear Storefront + WebMCP Inspector + ADK Copilot UI
 │   └── styles.css            # Dark-mode workspace styles & actuation animations
+├── docs/assets/
+│   └── webmcp-adk-banner.jpg # Architecture hero banner displayed in README
 ├── tests/
 │   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC unit tests
 │   ├── integration/          # ADK streaming and A2A end-to-end server tests
