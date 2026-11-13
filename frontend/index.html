@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusGear — WebMCP + Google ADK Browser-Native Agent Demo</title>
+  <link rel="stylesheet" href="/webmcp-assets/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">W</div>
+      <div>
+        <h1>NexusGear Storefront</h1>
+        <div class="brand-sub">Browser-Native AI Agents · W3C WebMCP (`navigator.modelContext`) + Google ADK</div>
+      </div>
+    </div>
+    <div class="status-cluster">
+      <div class="pill" title="Active WebMCP Bridge Connection">
+        <span id="bridgeDot" class="dot"></span>
+        <span id="bridgeStatusText">Connecting WebMCP Bridge...</span>
+      </div>
+      <div class="pill">
+        <span id="toolCountBadge">0 WebMCP Tools</span>
+      </div>
+      <button id="resetBtn" class="btn" type="button">Reset Demo</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Left Storefront Surface -->
+    <section class="store-pane">
+      <div class="filter-bar">
+        <input
+          id="searchInput"
+          class="search-input"
+          type="search"
+          placeholder="Search catalog (or ask the ADK Agent)..."
+        />
+        <div id="categoryPills" class="cat-pills">
+          <button class="cat-pill active" data-cat="">All</button>
+          <button class="cat-pill" data-cat="audio">Audio</button>
+          <button class="cat-pill" data-cat="peripherals">Peripherals</button>
+          <button class="cat-pill" data-cat="travel">Travel</button>
+          <button class="cat-pill" data-cat="monitors">Monitors</button>
+        </div>
+        <label class="price-filter">
+          Max $:
+          <input id="maxPriceInput" type="number" min="0" step="25" value="0" style="width:74px;background:#0b0f17;border:1px solid #243049;color:#f1f5f9;padding:5px 7px;border-radius:6px;" />
+        </label>
+        <label class="price-filter">
+          <input id="inStockCheckbox" type="checkbox" />
+          In-Stock Only
+        </label>
+      </div>
+
+      <div id="catalogGrid" class="catalog-grid"></div>
+
+      <!-- Declarative WebMCP HTML Form -->
+      <div class="declarative-card">
+        <div class="section-head">
+          <div>
+            <h2 style="font-size:15px;font-weight:700;">Shipping Preferences</h2>
+            <p style="font-size:12px;color:#94a3b8;">
+              Auto-exposed to the ADK agent via the <strong>Declarative WebMCP HTML API</strong> — zero JS glue required!
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="tag-declarative">&lt;form toolname="update_shipping_form"&gt;</span>
+            <button id="toggleMarkupBtn" class="btn" type="button">View HTML</button>
+          </div>
+        </div>
+
+        <form
+          id="shippingForm"
+          toolname="update_shipping_form"
+          tooldescription="Populate the customer's shipping address and delivery speed form on the checkout page via the Declarative WebMCP HTML Form API."
+        >
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="sf_full_name">Recipient Full Name</label>
+              <input
+                id="sf_full_name"
+                name="full_name"
+                type="text"
+                required
+                placeholder="Alex Rivera"
+                toolparamdescription="Recipient full name"
+              />
+            </div>
+            <div class="form-field">
+              <label for="sf_email">Contact Email</label>
+              <input
+                id="sf_email"
+                name="email"
+                type="email"
+                required
+                placeholder="alex@example.com"
+                toolparamdescription="Contact email address"
+              />
+            </div>
+            <div class="form-field full">
+              <label for="sf_address">Shipping Address</label>
+              <input
+                id="sf_address"
+                name="address"
+                type="text"
+                required
+                placeholder="123 Market St, San Francisco, CA 94105"
+                toolparamdescription="Street, city, state, ZIP"
+              />
+            </div>
+            <div class="form-field">
+              <label for="sf_speed">Delivery Speed</label>
+              <select
+                id="sf_speed"
+                name="delivery_speed"
+                required
+                toolparamdescription="Shipping speed"
+              >
+                <option value="standard">Standard ($0.00)</option>
+                <option value="express">Express 2-Day ($15.00)</option>
+                <option value="overnight">Overnight Air ($29.00)</option>
+              </select>
+            </div>
+            <div class="form-field" style="justify-content:flex-end;">
+              <button class="btn btn-primary" type="submit">Save Shipping Details</button>
+            </div>
+          </div>
+        </form>
+
+        <pre id="markupPreview" class="code-preview">&lt;form
+  toolname="update_shipping_form"
+  tooldescription="Populate the customer's shipping address and delivery speed..."&gt;
+  &lt;input name="full_name" required toolparamdescription="Recipient full name" /&gt;
+  &lt;input name="email" type="email" required toolparamdescription="Contact email address" /&gt;
+  &lt;input name="address" required toolparamdescription="Street, city, state, ZIP" /&gt;
+  &lt;select name="delivery_speed" required toolparamdescription="Shipping speed"&gt;
+    &lt;option value="standard"&gt;Standard&lt;/option&gt;
+    &lt;option value="express"&gt;Express&lt;/option&gt;
+    &lt;option value="overnight"&gt;Overnight&lt;/option&gt;
+  &lt;/select&gt;
+&lt;/form&gt;</pre>
+      </div>
+    </section>
+
+    <!-- Right Copilot + WebMCP Inspector + Cart Panel -->
+    <aside class="side-pane">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="chatTab">ADK Agent</button>
+        <button class="tab-btn" data-tab="inspectorTab">WebMCP Inspector</button>
+        <button class="tab-btn" data-tab="cartTab">Cart (<span id="cartCountTab">0</span>)</button>
+      </div>
+
+      <!-- Tab 1: Embedded ADK Chat -->
+      <div id="chatTab" class="tab-panel active">
+        <div class="prompt-chips">
+          <button class="chip" data-prompt="What WebMCP tools are exposed on this page, and which wireless ANC headphones are under $300?">1. Discover &amp; Search</button>
+          <button class="chip" data-prompt="Add the AeroPulse Pro ANC Headphones to my cart and apply promo code WEBMCP20.">2. Cart + Promo</button>
+          <button class="chip" data-prompt="Fill the shipping form for Alex Rivera (alex@example.com) at 123 Market St, San Francisco, CA with express delivery.">3. Declarative Form</button>
+          <button class="chip" data-prompt="Check out my cart immediately to Alex Rivera, 123 Market St, San Francisco, CA.">4. Test Safety Gate</button>
+          <button class="chip" data-prompt="Yes, I confirm! Please place the order for Alex Rivera at 123 Market St, San Francisco, CA.">5. Confirm Order</button>
+        </div>
+        <div id="chatMessages" class="chat-messages">
+          <div class="msg agent">Welcome! I am <strong>webmcp_agent</strong>, built on <strong>Google ADK</strong>. Instead of brittle DOM scraping, I discover and call this page's live <code>navigator.modelContext</code> tools and declarative HTML forms. Try one of the prompt chips above!</div>
+        </div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" type="text" placeholder="Ask webmcp_agent to browse, fill forms, or shop..." autocomplete="off" />
+          <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+      </div>
+
+      <!-- Tab 2: Live WebMCP Protocol Inspector -->
+      <div id="inspectorTab" class="tab-panel">
+        <div class="scroll-body">
+          <h3 style="font-size:12.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Live RPC Event Stream</h3>
+          <div id="rpcEventList" style="display:flex;flex-direction:column;gap:8px;">
+            <div class="event-card" style="color:#94a3b8;">Waiting for WebMCP tool invocations...</div>
+          </div>
+
+          <h3 style="font-size:12.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-top:10px;">Registered navigator.modelContext Tools</h3>
+          <div id="registeredSchemasList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Live Shopping Cart & Orders -->
+      <div id="cartTab" class="tab-panel">
+        <div class="scroll-body">
+          <div id="cartSummaryBox" class="cart-box"></div>
+          <div style="display:flex;gap:6px;">
+            <input id="manualPromoInput" type="text" placeholder="Promo (WEBMCP20, ADK10)" style="flex:1;background:#0b0f17;border:1px solid #243049;color:#f1f5f9;padding:7px 10px;border-radius:7px;font-size:12px;" />
+            <button id="applyPromoBtn" class="btn" type="button">Apply</button>
+          </div>
+          <h3 style="font-size:12.5px;color:#94a3b8;text-transform:uppercase;margin-top:8px;">Completed Orders</h3>
+          <div id="ordersList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/webmcp-assets/webmcp-sdk.js"></script>
+  <script src="/webmcp-assets/storefront.js"></script>
+</body>
+</html>
+
