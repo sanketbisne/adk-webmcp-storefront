@@ -241,13 +241,63 @@ Open **[http://127.0.0.1:8000/webmcp](http://127.0.0.1:8000/webmcp)** in Chrome.
 
 ## Interactive Demo Walkthrough
 
-In the **ADK Agent** sidebar on `/webmcp`, click the 5 numbered prompt chips in sequence—or type your own requests—while watching the storefront UI and **WebMCP Inspector** tab update in real time:
+Open `/webmcp` and either click the 5 preset prompt chips in the **ADK Agent** panel or type your own requests. Each step below shows what happens in the UI.
 
-1. **Discover & Search:** Lists all 8 registered `navigator.modelContext` tools (7 imperative + 1 declarative) and highlights matching ANC headphones under `$300` (`prod-101`, `prod-102`).
-2. **Cart + Promo:** Adds `AeroPulse Pro ANC Headphones` (`$249.00`) and applies `WEBMCP20` (`-$49.80` → `$199.20`), updating the Cart badge live.
-3. **Declarative Form Actuation:** Populates `<form toolname="update_shipping_form">` (`full_name`, `email`, `address`, `delivery_speed="express"`) with green field-flash animations and recalculates shipping (`+$15.00`).
-4. **Test Safety Gate:** Attempts immediate checkout—`checkout_confirmation_guard` intercepts the irreversible call and asks for explicit approval.
-5. **Confirm Order:** Replies `"Yes, I confirm!..."`—passes the guard, executes `checkout_order` in the browser, clears the cart, decrements inventory, and displays the `NXG-XXXXXX` receipt.
+### 1. Search and add to cart
+Prompt: `"Hi i want to order 7 keyboards"`
+The agent calls `search_products`, `get_cart`, and `add_to_cart` over the WebSocket bridge (`WebMCP Bridge Live (WS)`), updating the **Cart (7)** tab badge and `$1,323.00` subtotal.
+
+![Search and cart addition](docs/assets/ui-step1-cart-add.jpg)
+
+### 2. Declarative HTML form fill (`<form toolname="update_shipping_form">`)
+Replying with name, email, address, and delivery speed invokes the declarative form tool directly, highlighting the `<form>` in green and filling the fields without custom JavaScript handlers.
+
+![Declarative shipping form populated](docs/assets/ui-step2-declarative-form.jpg)
+
+### 3. Checkout confirmation gate (`checkout_confirmation_guard`)
+Before `checkout_order` can run, `checkout_confirmation_guard` stops the call and asks for explicit confirmation (`"Yes, I confirm"`) with the item summary and `$1,323.00` total.
+
+![Checkout safety confirmation gate](docs/assets/ui-step3-safety-gate.jpg)
+
+### 4. Confirmed order and toast receipt
+After confirmation, `checkout_order` runs in the browser, resets the cart badge to `Cart (0)`, decrements stock, shows the confirmation toast, and returns order ID `NXG-DF2A9F`.
+
+![Confirmed order and toast](docs/assets/ui-step4-order-confirmed.png)
+
+### 5. Completed orders in the Cart tab
+The **Cart** tab shows the empty active cart and the completed order record (`Order NXG-DF2A9F Confirmed`).
+
+![Completed orders in Cart tab](docs/assets/ui-step5-cart-completed.png)
+
+### 6. WebMCP Inspector RPC log
+The **WebMCP Inspector** tab logs each `navigator.modelContext` JSON-RPC call and lists the active tool schemas.
+
+![WebMCP Inspector RPC stream](docs/assets/ui-step6-webmcp-inspector.png)
+
+### 7. ADK Dev UI: events and tool graph (`/dev-ui/?app=app`)
+Sending `"Search for audio products under $250 and add 1 AeroPulse Pro ANC Headphones to my cart."` in the ADK Dev UI shows the `search_products` and `add_to_cart` events, cart total (`$249.00 USD`), and tool graph.
+
+![ADK Dev UI events](docs/assets/ui-step7-adk-dev-ui.png)
+
+### 8. ADK Dev UI: OpenTelemetry trace waterfall
+Sending `"Apply promo code WEBMCP20 and show my cart total."` and opening the **Trace** tab shows the span waterfall (`invoke_workflow webmcp_agent`, `generate_content`, `search_products`, `add_to_cart`, `apply_promo_code`).
+
+![ADK Dev UI trace waterfall](docs/assets/ui-step8-adk-traces.png)
+
+### 9. Out-of-stock fallback
+Asking for `prod-106` (`0` in stock) triggers `get_product_details` and `search_products(category="travel", in_stock_only=true)`, returning `Voyager Carbon 22-Inch Smart Carry-On` (`prod-107`, `$279.00`) as an in-stock alternative.
+
+![Out-of-stock alternative recommendation](docs/assets/ui-step9-out-of-stock.png)
+
+### 10. Multi-item cart, promo, and item removal
+Adding `prod-105` and `prod-104`, applying `SAVE25` (`-$25.00`), and removing `prod-105` updates the badge to `Cart (1)` with a `$164.00 USD` total.
+
+![Multi-item cart, promo, and item removal](docs/assets/ui-step10-cart-modify-promo.png)
+
+### 11. Input validation guardrail (XSS check)
+Sending `<script>alert(1)</script>` in `full_name` is blocked by `input_validation_guard` before reaching the DOM, leaving the shipping form unchanged.
+
+![Input validation guardrail](docs/assets/ui-step11-xss-guardrail.png)
 
 ---
 
@@ -286,7 +336,9 @@ webmcp-adk/
 │   ├── index.html            # NexusGear Storefront + WebMCP Inspector + ADK Copilot UI
 │   └── styles.css            # Dark-mode workspace styles & actuation animations
 ├── docs/assets/
-│   └── webmcp-adk-banner.jpg # Architecture hero banner displayed in README
+│   ├── webmcp-adk-banner.jpg         # Architecture hero banner displayed in README
+│   ├── ui-step*.png / .jpg           # Step-by-step Storefront, Inspector & ADK Dev UI screenshots
+│   └── gcp-*.png / .jpg              # Google Cloud Agent Runtime metrics, revisions & log screenshots
 ├── tests/
 │   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC unit tests
 │   ├── integration/          # ADK streaming and A2A end-to-end server tests
@@ -321,6 +373,51 @@ agents-cli eval run
 # Held-out edge cases (out-of-stock handling & declarative HTML form actuation)
 agents-cli eval run --dataset tests/eval/datasets/holdout-dataset.json
 ```
+
+---
+
+## Deployment, Observability & Evaluation Metrics
+
+Deployed on **Google Cloud Agent Runtime** (`us-central1`, `google-adk`, telemetry enabled).
+
+### Observed Metrics
+
+| Suite / Source | Metric | Observed Result |
+|---|---|---|
+| `tests/unit` | Store, guardrails & WS RPC | `7 passed` |
+| `tests/integration` | `test_agent_stream`, `/run_sse`, A2A & agent card | `4 passed` |
+| `basic-dataset.json` (4 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
+| `holdout-dataset.json` (2 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
+| GCP Agent Runtime (Overview) | Sessions / Avg turns / Invocations | `1` · `1` · `4` |
+| GCP Agent Runtime (Latency) | P95 agent latency / P95 tool latency | `28s` · `0.01s` (`5` tool calls) |
+| GCP Agent Runtime (Tokens) | Input tokens / Output tokens | `15,761` · `1,970` |
+| GCP Agent Runtime (Revisions) | Active revisions / Traffic split | `1 of 1` (`100%` on revision `1`) |
+
+### GCP Console Screenshots
+
+1. **Agent Runtime Deployment (`Gemini Platform -> Deployments`):** `webmcp-adk` running in `us-central1 (Iowa)` on `google-adk` with telemetry enabled.
+
+![GCP Agent Runtime Deployment](docs/assets/gcp-deployments.png)
+
+2. **Overview (`Dashboard -> Overview`):** `1` session, `4` invocations, `28s` P95 latency, `15,761` input tokens, `1,970` output tokens.
+
+![GCP Overview Metrics](docs/assets/gcp-overview-metrics.png)
+
+3. **Tools (`Dashboard -> Tools`):** `5` tool calls, `0.01s` P95 tool latency, broken down by `search_products`, `get_cart`, and `apply_promo_code`.
+
+![GCP Tool Metrics](docs/assets/gcp-tools-metrics.png)
+
+4. **Usage (`Dashboard -> Usage`):** Input/output token usage and container CPU/memory allocation.
+
+![GCP Usage and Container Metrics](docs/assets/gcp-usage-metrics.png)
+
+5. **Revisions (`Revisions`):** `1 of 1` active revision (`runtimeRevisions/1`) serving `100%` traffic.
+
+![GCP Revisions](docs/assets/gcp-revisions.png)
+
+6. **Logs (`Dashboard -> Logs`):** Container startup and `200 OK` responses on `/api/webmcp/status`, `/a2a/app/.well-known/agent-card.json`, `/run_sse`, and `/a2a/app`.
+
+![GCP Agent Logs](docs/assets/gcp-logs.jpg)
 
 ---
 

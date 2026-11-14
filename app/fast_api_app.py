@@ -30,7 +30,10 @@ load_dotenv()
 allow_origins = (
     os.getenv("ALLOW_ORIGINS", "").split(",") if os.getenv("ALLOW_ORIGINS") else None
 )
-otel_to_cloud = True
+otel_to_cloud = os.getenv(
+    "OTEL_TO_CLOUD",
+    os.getenv("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", ""),
+).strip().lower() in {"1", "true", "yes"} or bool(os.getenv("K_SERVICE"))
 
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
