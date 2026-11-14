@@ -320,7 +320,7 @@ Sending `<script>alert(1)</script>` in `full_name` is rejected by `input_validat
 ## Project Structure
 
 ```text
-webmcp-adk/
+adk-webmcp-storefront/
 ├── app/
 │   ├── agent.py              # root_agent ("webmcp_agent") & App(name="app") definition
 │   ├── tools.py              # 9 typed ADK FunctionTools bridging to WebMCP
