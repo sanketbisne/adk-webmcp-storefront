@@ -206,8 +206,10 @@ Implemented in [`app/guardrails.py`](app/guardrails.py) and registered as an ord
 - **Python** `>=3.11, <3.14`
 - **[`uv`](https://docs.astral.sh/uv/)** & **[`google-agents-cli`](https://pypi.org/project/google-agents-cli/)** (`uv tool install google-agents-cli`)
 
-### 1. Install Dependencies
+### 1. Clone & Install Dependencies
 ```bash
+git clone https://github.com/sanketbisne/adk-webmcp-storefront.git
+cd adk-webmcp-storefront
 agents-cli install
 ```
 
@@ -343,6 +345,7 @@ adk-webmcp-storefront/
 │   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC unit tests
 │   ├── integration/          # ADK streaming and A2A end-to-end server tests
 │   └── eval/                 # Evaluation config, LLM judge, and basic/holdout datasets
+├── agents-cli-manifest.yaml
 ├── pyproject.toml
 ├── Dockerfile
 └── .env.example
@@ -356,6 +359,9 @@ adk-webmcp-storefront/
 ```bash
 # Run deterministic unit tests (store logic, guardrails, HTTP & WebSocket RPC)
 uv run pytest tests/unit -v
+
+# Run ADK streaming & A2A integration tests
+uv run pytest tests/integration -v
 
 # Check frontend JavaScript syntax
 node --check frontend/webmcp-sdk.js && node --check frontend/storefront.js
