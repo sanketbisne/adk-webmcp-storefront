@@ -1,79 +1,81 @@
 <div align="center">
 
-# 🌐 Browser-Native AI Agents with WebMCP & Google ADK
+# Browser-Native Agents with WebMCP and Google ADK
 
-**Turn any web application into a deterministic, typed tool surface for autonomous AI agents — zero brittle DOM scraping, zero pixel guessing.**
+A reference storefront application demonstrating how a Google ADK agent interacts with a live web UI through the W3C Web Model Context Protocol (`navigator.modelContext`) and declarative HTML forms.
 
 <p>
-  <img src="docs/assets/webmcp-adk-banner.jpg" alt="Browser-Native AI Agents with WebMCP and Google ADK Architecture" width="100%" />
+  <img src="docs/assets/webmcp-adk-banner.jpg" alt="WebMCP and Google ADK Architecture" width="100%" />
 </p>
 
-[![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.12%2B-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://adk.dev/)
-[![WebMCP](https://img.shields.io/badge/W3C%20WebMCP-navigator.modelContext-0EA5E9?style=for-the-badge&logo=googlechrome&logoColor=white)](#two-webmcp-surfaces-imperative--declarative)
-[![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket%20Bridge-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![A2A](https://img.shields.io/badge/A2A%20Protocol-Enabled-8B5CF6?style=for-the-badge)](#api--websocket-endpoints)
-[![License](https://img.shields.io/badge/License-Apache%202.0-34D399?style=for-the-badge)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Python 3.11-3.13](https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-2.12%2B-4285F4?style=flat-square&logo=google&logoColor=white)](https://adk.dev/)
+[![WebMCP](https://img.shields.io/badge/WebMCP-navigator.modelContext-0EA5E9?style=flat-square&logo=googlechrome&logoColor=white)](#webmcp-surfaces)
+[![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket%20RPC-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![A2A](https://img.shields.io/badge/A2A-Enabled-8B5CF6?style=flat-square)](#api-and-websocket-reference)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-34D399?style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
 
 <p>
-  <a href="#why-browser-native-agents">Why WebMCP</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#two-webmcp-surfaces-imperative--declarative">WebMCP APIs</a> •
-  <a href="#safety-guardrails-before_tool_callback">Safety Guardrails</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#interactive-demo-walkthrough">Demo Walkthrough</a> •
-  <a href="#testing--evaluation">Testing &amp; Eval</a> •
-  <a href="#deployment-observability--evaluation-metrics">Cloud Metrics</a>
+  <a href="#overview">Overview</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#webmcp-surfaces">WebMCP Surfaces</a> ·
+  <a href="#tools-and-guardrails">Tools &amp; Guardrails</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#walkthrough">Walkthrough</a> ·
+  <a href="#testing-and-evaluation">Testing &amp; Eval</a> ·
+  <a href="#deployment-and-observability">Deployment &amp; Metrics</a>
 </p>
 
 </div>
 
 ---
 
-## Why Browser-Native Agents?
+## Overview
 
-Traditional browser automation forces AI agents to act like fragile screen-scrapers—parsing shifting CSS selectors, capturing heavy screenshots, and guessing pixel coordinates. This repository showcases the **Web Model Context Protocol (WebMCP)** paired with **Google's Agent Development Kit (ADK)** inside a full-stack demo storefront (**NexusGear Storefront**).
+Most browser agents rely on DOM scraping, accessibility-tree heuristics, or screenshot-based coordinate clicking. Small layout changes break selectors, and every UI action requires extra round-trips.
 
-| Dimension | Legacy Screen-Scraping / Computer Use | Browser-Native WebMCP + Google ADK |
+This repository pairs **WebMCP** with **Google ADK** inside a sample e-commerce app (**NexusGear Storefront**). The frontend registers typed JSON-Schema tools directly in the browser tab and forwards tool calls over a WebSocket RPC bridge to an ADK agent (`webmcp_agent`).
+
+| Capability | DOM / Screenshot Automation | WebMCP + Google ADK |
 |---|---|---|
-| **Tool Discovery** | Brittle DOM tree heuristics & ARIA guesswork | Explicit JSON Schemas via `navigator.modelContext` & `<form toolname>` |
-| **UI Actuation** | Fragile `click(x, y)` and CSS selectors that break on redesigns | Typed RPC tool execution directly against live UI handlers |
-| **Form Filling** | Multi-step typing & focus hacks per input field | Single-call **Declarative WebMCP HTML Form** population |
-| **Safety & Governance** | Prompt-only instructions (easy to bypass) | Deterministic ADK `before_tool_callback` guardrails before execution |
-| **Testing & Eval** | Slow, flaky headless browser runs | Synchronized state store supports instant `pytest` & `agents-cli eval` |
+| **Tool discovery** | Fragile CSS selectors or ARIA parsing | Explicit JSON Schemas via `navigator.modelContext` and `<form toolname>` |
+| **UI execution** | Simulated clicks and keystrokes | Direct RPC calls into live page handlers |
+| **Form input** | Per-field focus and typing loops | Single-call declarative HTML form population |
+| **Safety checks** | Prompt-only instructions | Deterministic `before_tool_callback` guardrails in Python |
+| **Testability** | Slow headless browser runs | Synchronized state store for `pytest` and `agents-cli eval` |
 
 ---
 
 ## Architecture
 
-The project unifies three layers inside a single FastAPI + ADK application (`app/fast_api_app.py`), with an optional standalone bridge launcher (`app/bridge_server.py`):
+A single FastAPI + ADK service (`app/fast_api_app.py`) hosts the storefront UI, WebSocket bridge, ADK runner, and A2A endpoints. A standalone bridge launcher (`app/bridge_server.py`) is also included for external CLI agents.
 
 ```mermaid
 flowchart LR
     subgraph Browser["Browser Tab (/webmcp)"]
-        UI["NexusGear Storefront UI\n(frontend/storefront.js)"]
+        UI["NexusGear Storefront\n(frontend/storefront.js)"]
         Form["Declarative HTML Form\n(form toolname=update_shipping_form)"]
         SDK["WebMCP Browser SDK\n(frontend/webmcp-sdk.js)"]
         UI <-->|"Imperative registerTool()"| SDK
         Form -->|"MutationObserver Auto-Schema"| SDK
     end
 
-    subgraph Runtime["Unified FastAPI + Google ADK Server"]
-        Bridge["WebMCP Bridge Manager\n(/ws/webmcp + /api/webmcp/*)"]
+    subgraph Runtime["FastAPI + Google ADK Server"]
+        Bridge["WebMCP Bridge\n(/ws/webmcp + /api/webmcp/*)"]
         Store["Synchronized WebMcpStore\n(Headless / Eval Fallback)"]
-        Guard["ADK Guardrail Chain\n(input_validation + checkout_confirmation)"]
+        Guard["ADK Guardrails\n(input_validation + checkout_confirmation)"]
         Agent["Google ADK Agent\n(webmcp_agent · gemini-3.8-flash)"]
-        A2A["A2A + ADK Endpoints\n(/run_sse · /a2a/app)"]
+        A2A["ADK + A2A Endpoints\n(/run_sse · /a2a/app)"]
     end
 
-    SDK <-->|"Live WebSocket RPC"| Bridge
+    SDK <-->|"WebSocket RPC"| Bridge
     Bridge <--> Store
     A2A --> Agent --> Guard --> Bridge
 ```
 
-### Checkout Safety Flow (`before_tool_callback`)
+### Checkout Confirmation Flow
 
-Irreversible actions never execute on speculative LLM guesses. The ADK guardrail chain intercepts every tool call before it reaches the browser:
+Irreversible actions are gated in Python before any RPC call reaches the browser:
 
 ```mermaid
 sequenceDiagram
@@ -95,17 +97,18 @@ sequenceDiagram
     Agent->>Guard: checkout_order(user_confirmed=True)
     Guard-->>Bridge: Allowed (explicit confirmation verified)
     Bridge->>Browser: webmcp:call_tool(checkout_order)
-    Browser-->>User: Live toast + Order NXG-XXXXXX receipt
+    Browser-->>User: Confirmation toast + Order NXG-XXXXXX
 ```
 
 ---
 
-## Two WebMCP Surfaces: Imperative & Declarative
+## WebMCP Surfaces
 
-[`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) polyfills `window.navigator.modelContext` (forwarding to native browser support when present) and exposes both WebMCP specification modes to `webmcp_agent`:
+[`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) polyfills `window.navigator.modelContext` (delegating to native browser support if available) and exposes two registration patterns.
 
-### 1. Imperative WebMCP API (`navigator.modelContext.registerTool`)
-JavaScript components in [`frontend/storefront.js`](frontend/storefront.js) register structured tools complete with JSON Schemas and live visual side effects (highlighting matched product cards, updating the cart drawer, and emitting protocol inspector events):
+### Imperative API (`navigator.modelContext.registerTool`)
+
+[`frontend/storefront.js`](frontend/storefront.js) registers catalog, cart, and checkout handlers with JSON Schemas and DOM updates:
 
 ```javascript
 window.navigator.modelContext.registerTool({
@@ -126,8 +129,9 @@ window.navigator.modelContext.registerTool({
 });
 ```
 
-### 2. Declarative WebMCP HTML API (`<form toolname="...">`)
-Zero JavaScript tool glue required. A `MutationObserver` in [`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) automatically scans annotated `<form toolname="...">` elements in [`frontend/index.html`](frontend/index.html), synthesizes their JSON Schemas from `<input>` / `<select>` attributes, and binds animated field-fill actuation:
+### Declarative HTML API (`<form toolname="...">`)
+
+A `MutationObserver` in [`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) inspects annotated `<form toolname="...">` elements in [`frontend/index.html`](frontend/index.html), derives their JSON Schema from `<input>` and `<select>` attributes, and binds field population without custom tool code:
 
 ```html
 <form
@@ -148,24 +152,26 @@ Zero JavaScript tool glue required. A `MutationObserver` in [`frontend/webmcp-sd
 
 ---
 
-## Tool Catalog (`webmcp_agent`)
+## Tools and Guardrails
 
-The ADK agent ([`app/agent.py`](app/agent.py)) exposes 9 typed `FunctionTool`s ([`app/tools.py`](app/tools.py)) mapped to discovery and browser actuation:
+### ADK Tool Catalog
 
-| Tool Name | WebMCP Surface | Category | Key Parameters |
+[`app/agent.py`](app/agent.py) wires 9 typed `FunctionTool` wrappers from [`app/tools.py`](app/tools.py) to the WebMCP bridge:
+
+| Tool | Surface | Behavior | Parameters |
 |---|---|---|---|
-| `list_webmcp_tools` | Bridge Discovery | Read-Only | — |
-| `search_products` | Imperative (`registerTool`) | Read-Only | `query`, `category`, `max_price`, `in_stock_only` |
-| `get_product_details` | Imperative (`registerTool`) | Read-Only | `product_id` |
-| `get_cart` | Imperative (`registerTool`) | Read-Only | — |
-| `add_to_cart` | Imperative (`registerTool`) | State-Mutating | `product_id`, `quantity` (`1–10`) |
-| `remove_from_cart` | Imperative (`registerTool`) | State-Mutating | `product_id` |
-| `apply_promo_code` | Imperative (`registerTool`) | State-Mutating | `code` |
-| `update_shipping_form` | Declarative (`<form toolname>`) | State-Mutating | `full_name`, `email`, `address`, `delivery_speed` |
-| `checkout_order` | Imperative (`registerTool`) | **Safety-Gated** | `full_name`, `address`, `user_confirmed` |
+| `list_webmcp_tools` | Bridge discovery | Read-only | — |
+| `search_products` | Imperative | Read-only | `query`, `category`, `max_price`, `in_stock_only` |
+| `get_product_details` | Imperative | Read-only | `product_id` |
+| `get_cart` | Imperative | Read-only | — |
+| `add_to_cart` | Imperative | Mutating | `product_id`, `quantity` (`1–10`) |
+| `remove_from_cart` | Imperative | Mutating | `product_id` |
+| `apply_promo_code` | Imperative | Mutating | `code` |
+| `update_shipping_form` | Declarative (`<form>`) | Mutating | `full_name`, `email`, `address`, `delivery_speed` |
+| `checkout_order` | Imperative | Safety-gated | `full_name`, `address`, `user_confirmed` |
 
 <details>
-<summary><strong>📦 Sample Storefront Catalog &amp; Promo Codes (click to expand)</strong></summary>
+<summary>Sample Storefront Catalog &amp; Promo Codes</summary>
 
 | ID | Product | Category | Price | Stock |
 |---|---|---|---|---|
@@ -174,115 +180,113 @@ The ADK agent ([`app/agent.py`](app/agent.py)) exposes 9 typed `FunctionTool`s (
 | `prod-103` | StudioMax Planar ANC Headphones | `audio` | $399.00 | 6 |
 | `prod-104` | KeyChronos Q1 Mechanical Keyboard | `peripherals` | $189.00 | 19 |
 | `prod-105` | PrecisionGlide Pro Ergonomic Mouse | `peripherals` | $89.00 | 32 |
-| `prod-106` | NomadPack 35L Tech Carry-On Backpack | `travel` | $219.00 | **0 (Out of Stock)** |
+| `prod-106` | NomadPack 35L Tech Carry-On Backpack | `travel` | $219.00 | 0 (Out of Stock) |
 | `prod-107` | Voyager Carbon 22-Inch Smart Carry-On | `travel` | $279.00 | 9 |
 | `prod-108` | LumaView 16-Inch 4K OLED Portable Monitor | `monitors` | $349.00 | 11 |
 
-**Active Promo Codes:**
-- `WEBMCP20` — 20% off subtotal
-- `ADK10` — 10% off subtotal
-- `SAVE25` — `$25.00` flat discount on orders with subtotal of `$100.00` or more
+Promo codes:
+- `WEBMCP20`: 20% off subtotal
+- `ADK10`: 10% off subtotal
+- `SAVE25`: `$25.00` off orders with subtotal `>= $100.00`
 
 </details>
 
----
+### Callback Guardrails
 
-## Safety Guardrails (`before_tool_callback`)
+[`app/guardrails.py`](app/guardrails.py) registers an ordered callback chain on `root_agent`:
 
-Implemented in [`app/guardrails.py`](app/guardrails.py) and registered as an ordered callback chain on [`root_agent`](app/agent.py):
-
-1. **`record_turn_context` (`before_agent_callback`):** Captures the current turn's `latest_user_message` and `webmcp_session_id` into ADK session state.
-2. **`input_validation_guard` (`before_tool_callback` #1):**
-   - Rejects script/HTML injection payloads (`<script>`, `javascript:`, `onerror=`/`onload=`/`onclick=`) across all string arguments before they reach the browser DOM.
-   - Enforces integer bounds `1 <= quantity <= 10` on `add_to_cart`.
-3. **`checkout_confirmation_guard` (`before_tool_callback` #2):**
-   - Intercepts `checkout_order` and blocks execution unless **both** `args["user_confirmed"] is True` **and** `has_explicit_confirmation(user_text)` matches affirmative approval (while rejecting negations such as *"do not"*, *"cancel"*, or *"wait"*).
+1. `record_turn_context` (`before_agent_callback`): stores `latest_user_message` and `webmcp_session_id` in ADK session state.
+2. `input_validation_guard` (`before_tool_callback`): rejects `<script>`, `javascript:`, and inline event handlers (`onerror=`, `onload=`, `onclick=`) in string arguments, and bounds `add_to_cart` quantity to `1–10`.
+3. `checkout_confirmation_guard` (`before_tool_callback`): blocks `checkout_order` unless `args["user_confirmed"] is True` and `has_explicit_confirmation(user_text)` matches affirmative approval without negation terms (`"do not"`, `"cancel"`, `"wait"`).
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- **Python** `>=3.11, <3.14`
-- **[`uv`](https://docs.astral.sh/uv/)** & **[`google-agents-cli`](https://pypi.org/project/google-agents-cli/)** (`uv tool install google-agents-cli`)
 
-### 1. Clone & Install Dependencies
+- Python `>=3.11, <3.14`
+- [`uv`](https://docs.astral.sh/uv/)
+- [`google-agents-cli`](https://pypi.org/project/google-agents-cli/) (`uv tool install google-agents-cli`)
+
+### 1. Clone and Install
+
 ```bash
 git clone https://github.com/sanketbisne/adk-webmcp-storefront.git
 cd adk-webmcp-storefront
 agents-cli install
 ```
 
-### 2. Configure Gemini Credentials (`.env`)
-Choose **Vertex AI / Gemini Platform** or **Google AI Studio**:
+### 2. Configure Credentials (`.env`)
 
-- **Option A — Vertex AI / Gemini Platform (ADC):**
+Use either **Vertex AI (Application Default Credentials)** or a **Google AI Studio API key**:
+
+- **Vertex AI (ADC):**
   ```bash
   gcloud auth application-default login
   ```
-  Verify `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION=global` in `.env`.
+  Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION=global` in `.env`.
 
-- **Option B — Google AI Studio API Key:**
-  In `.env`, comment out the `GOOGLE_*` variables and set:
+- **Google AI Studio:**
+  Comment out `GOOGLE_*` in `.env` and set:
   ```env
   GEMINI_API_KEY=your-api-key-here
   ```
 
-### 3. Launch the Full-Stack App
+### 3. Run Locally
+
 ```bash
 uv run uvicorn app.fast_api_app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Open **[http://127.0.0.1:8000/webmcp](http://127.0.0.1:8000/webmcp)** in Chrome.
 
-> **Alternative Launch Modes:**
-> - **ADK Developer Playground:** `agents-cli playground`
-> - **CLI Smoke Test:** `agents-cli run "What WebMCP tools are exposed on this page?"`
-> - **Standalone Bridge Server (`:8765`):** `uv run python -m app.bridge_server` (point external CLI agents via `WEBMCP_BRIDGE_URL=http://127.0.0.1:8765`)
+Other launch options:
+- ADK playground: `agents-cli playground`
+- CLI run: `agents-cli run "What WebMCP tools are exposed on this page?"`
+- Standalone bridge (`:8765`): `uv run python -m app.bridge_server` (set `WEBMCP_BRIDGE_URL=http://127.0.0.1:8765` for external clients)
 
 ---
 
-## Interactive Demo Walkthrough
-
-Open `/webmcp` and click the 5 preset prompt chips in the **ADK Agent** panel or type your own requests.
+## Walkthrough
 
 ### 1. Search and add to cart
-Prompt: `"Hi i want to order 7 keyboards"` — calls `search_products`, `get_cart`, and `add_to_cart` over WebSocket, updating **Cart (7)** (`$1,323.00`).
+Prompt: `"Hi i want to order 7 keyboards"` — runs `search_products`, `get_cart`, and `add_to_cart` over WebSocket, updating **Cart (7)** (`$1,323.00`).
 
 ![Step 1: Search and cart addition](docs/assets/ui-step1-cart-add.jpg)
 
 ### 2. Declarative HTML form fill (`<form toolname="update_shipping_form">`)
-Replying with shipping details invokes the declarative form tool directly, highlighting the `<form>` in green and populating every field.
+Providing shipping details invokes the declarative form tool directly, highlighting `<form>` and filling all fields.
 
 ![Step 2: Declarative shipping form populated](docs/assets/ui-step2-declarative-form.jpg)
 
 ### 3. Checkout confirmation gate (`checkout_confirmation_guard`)
-Before `checkout_order` runs, `checkout_confirmation_guard` stops execution and asks for explicit approval (`"Yes, I confirm"`).
+`checkout_confirmation_guard` halts `checkout_order` and asks for explicit approval (`"Yes, I confirm"`).
 
 ![Step 3: Checkout safety confirmation gate](docs/assets/ui-step3-safety-gate.jpg)
 
-### 4. Confirmed order and toast receipt
-After confirmation, `checkout_order` executes in the browser, resets the cart to `Cart (0)`, shows the confirmation toast, and returns order ID `NXG-DF2A9F`.
+### 4. Confirmed order and receipt
+After confirmation, `checkout_order` executes in the browser, resets the cart to `Cart (0)`, shows a toast, and returns order ID `NXG-DF2A9F`.
 
 ![Step 4: Confirmed order and toast](docs/assets/ui-step4-order-confirmed.png)
 
-### 5. Completed orders in the Cart tab
-The **Cart** tab displays the empty active cart alongside `Order NXG-DF2A9F Confirmed`.
+### 5. Completed orders in Cart tab
+The **Cart** tab displays the cleared cart alongside `Order NXG-DF2A9F Confirmed`.
 
 ![Step 5: Completed orders in Cart tab](docs/assets/ui-step5-cart-completed.png)
 
 ### 6. WebMCP Inspector RPC log
-The **WebMCP Inspector** tab records every `navigator.modelContext` JSON-RPC invocation and lists the registered tool schemas.
+The **WebMCP Inspector** tab logs every `navigator.modelContext` JSON-RPC call and lists active tool schemas.
 
 ![Step 6: WebMCP Inspector RPC stream](docs/assets/ui-step6-webmcp-inspector.png)
 
 ### 7. ADK Dev UI: events and tool graph (`/dev-ui/?app=app`)
-Running `"Search for audio products under $250 and add 1 AeroPulse Pro ANC Headphones to my cart."` in the ADK Dev UI shows the `search_products` and `add_to_cart` events, `$249.00 USD` cart summary, and tool graph.
+Running `"Search for audio products under $250 and add 1 AeroPulse Pro ANC Headphones to my cart."` in ADK Dev UI shows `search_products` and `add_to_cart` events, `$249.00 USD` cart summary, and the tool graph.
 
 ![Step 7: ADK Dev UI events](docs/assets/ui-step7-adk-dev-ui.png)
 
 ### 8. ADK Dev UI: OpenTelemetry trace waterfall
-Following up with `"Apply promo code WEBMCP20 and show my cart total."` renders the span waterfall in the **Trace** tab (`invoke_workflow webmcp_agent`, `generate_content`, `search_products`, `add_to_cart`, `apply_promo_code`).
+Following up with `"Apply promo code WEBMCP20 and show my cart total."` records spans in the **Trace** tab (`invoke_workflow webmcp_agent`, `generate_content`, `search_products`, `add_to_cart`, `apply_promo_code`).
 
 ![Step 8: ADK Dev UI trace waterfall](docs/assets/ui-step8-adk-traces.png)
 
@@ -291,60 +295,60 @@ Requesting `prod-106` (`0` in stock) triggers `get_product_details` and `search_
 
 ![Step 9: Out-of-stock alternative recommendation](docs/assets/ui-step9-out-of-stock.png)
 
-### 10. Multi-item cart, promo, and item removal
+### 10. Multi-item cart, promo, and removal
 Adding `prod-105` + `prod-104`, applying `SAVE25` (`-$25.00`), and removing `prod-105` updates the badge to `Cart (1)` with a `$164.00 USD` total.
 
 ![Step 10: Multi-item cart, promo, and item removal](docs/assets/ui-step10-cart-modify-promo.png)
 
 ### 11. Input validation guardrail (XSS check)
-Sending `<script>alert(1)</script>` in `full_name` is rejected by `input_validation_guard` before touching the DOM, leaving the shipping form unchanged.
+Sending `<script>alert(1)</script>` in `full_name` is blocked by `input_validation_guard` before touching the DOM.
 
 ![Step 11: Input validation guardrail](docs/assets/ui-step11-xss-guardrail.png)
 
 ---
 
-## API & WebSocket Endpoints
+## API and WebSocket Reference
 
-| Endpoint | Method | Purpose |
+| Endpoint | Method | Description |
 |---|---|---|
-| `/webmcp` | `GET` | Interactive NexusGear Storefront + Embedded ADK Copilot + WebMCP Inspector |
-| `/ws/webmcp` | `WS` | Bi-directional WebSocket channel relaying `webmcp:register_tools` and `webmcp:call_tool` |
-| `/api/webmcp/status` | `GET` | Connected browser tab count and categorized imperative/declarative tool names |
-| `/api/webmcp/tools` | `GET` | Full JSON Schemas of all active `navigator.modelContext` tools |
-| `/api/webmcp/state` | `GET` | Current catalog, cart totals, shipping form state, and RPC activity log |
-| `/api/webmcp/call` | `POST` | Invoke a WebMCP tool via the bridge (`{tool_name, args, session_id}`) |
+| `/webmcp` | `GET` | NexusGear Storefront, ADK Copilot panel, and WebMCP Inspector |
+| `/ws/webmcp` | `WS` | WebSocket RPC channel relaying `webmcp:register_tools` and `webmcp:call_tool` |
+| `/api/webmcp/status` | `GET` | Connected browser tab count and registered imperative/declarative tool names |
+| `/api/webmcp/tools` | `GET` | JSON Schemas of active `navigator.modelContext` tools |
+| `/api/webmcp/state` | `GET` | Catalog, cart totals, shipping form state, and RPC activity log |
+| `/api/webmcp/call` | `POST` | Invoke a WebMCP tool over the bridge (`{tool_name, args, session_id}`) |
 | `/api/webmcp/reset` | `POST` | Reset storefront catalog stock, cart, shipping form, and orders |
-| `/run_sse` | `POST` | Native ADK Server-Sent Events streaming endpoint |
-| `/a2a/app/.well-known/agent-card.json` | `GET` | Built-in A2A (Agent-to-Agent) AgentCard discovery endpoint |
+| `/run_sse` | `POST` | ADK Server-Sent Events streaming endpoint |
+| `/a2a/app/.well-known/agent-card.json` | `GET` | A2A AgentCard discovery endpoint |
 
 ---
 
-## Project Structure
+## Project Layout
 
 ```text
 adk-webmcp-storefront/
 ├── app/
-│   ├── agent.py              # root_agent ("webmcp_agent") & App(name="app") definition
-│   ├── tools.py              # 9 typed ADK FunctionTools bridging to WebMCP
-│   ├── guardrails.py         # before_agent & before_tool XSS, bounds, and confirmation gates
+│   ├── agent.py              # root_agent ("webmcp_agent") and App(name="app")
+│   ├── tools.py              # 9 typed ADK FunctionTools for WebMCP
+│   ├── guardrails.py         # before_agent and before_tool validation & confirmation gates
 │   ├── webmcp_bridge.py      # FastAPI + WebSocket relay (/ws/webmcp, /webmcp, /api/webmcp/*)
-│   ├── webmcp_store.py       # Deterministic catalog, cart, promo, and shipping state store
-│   ├── bridge_server.py      # Optional standalone WebMCP bridge server (port 8765)
+│   ├── webmcp_store.py       # Catalog, cart, promo, and shipping state store
+│   ├── bridge_server.py      # Standalone WebMCP bridge server (port 8765)
 │   ├── fast_api_app.py       # Unified FastAPI server (ADK + A2A + WebMCP Storefront)
-│   └── app_utils/            # Services & A2A routing helpers
+│   └── app_utils/            # Telemetry and A2A routing helpers
 ├── frontend/
-│   ├── webmcp-sdk.js         # navigator.modelContext polyfill + declarative <form toolname> scanner
-│   ├── storefront.js         # Imperative tool registrations, UI highlights & ADK chat client
-│   ├── index.html            # NexusGear Storefront + WebMCP Inspector + ADK Copilot UI
-│   └── styles.css            # Dark-mode workspace styles & actuation animations
+│   ├── webmcp-sdk.js         # navigator.modelContext polyfill + <form toolname> scanner
+│   ├── storefront.js         # Imperative tool registrations, UI highlights, ADK chat client
+│   ├── index.html            # Storefront, WebMCP Inspector, and ADK Copilot UI
+│   └── styles.css            # Workspace styles and actuation highlights
 ├── docs/assets/
-│   ├── webmcp-adk-banner.jpg         # Architecture hero banner displayed in README
-│   ├── ui-step*.png / .jpg           # Step-by-step Storefront, Inspector & ADK Dev UI screenshots
-│   └── gcp-*.png / .jpg              # Google Cloud Agent Runtime metrics, revisions & log screenshots
+│   ├── webmcp-adk-banner.jpg # Architecture banner
+│   ├── ui-step*.png / .jpg   # Storefront, Inspector, and ADK Dev UI screenshots
+│   └── gcp-*.png / .jpg      # Google Cloud Agent Runtime metrics and log screenshots
 ├── tests/
-│   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC unit tests
-│   ├── integration/          # ADK streaming and A2A end-to-end server tests
-│   └── eval/                 # Evaluation config, LLM judge, and basic/holdout datasets
+│   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC tests
+│   ├── integration/          # ADK streaming and A2A server integration tests
+│   └── eval/                 # Evaluation config, LLM judge, basic and holdout datasets
 ├── agents-cli-manifest.yaml
 ├── pyproject.toml
 ├── Dockerfile
@@ -353,51 +357,54 @@ adk-webmcp-storefront/
 
 ---
 
-## Testing & Evaluation
+## Testing and Evaluation
 
-### Unit Tests, Type Checks & Linting
+### Unit, Integration, and Lint Checks
+
 ```bash
-# Run deterministic unit tests (store logic, guardrails, HTTP & WebSocket RPC)
+# Unit tests (store logic, guardrails, HTTP, WebSocket RPC)
 uv run pytest tests/unit -v
 
-# Run ADK streaming & A2A integration tests
+# Integration tests (ADK streaming and A2A endpoints)
 uv run pytest tests/integration -v
 
-# Check frontend JavaScript syntax
+# Frontend syntax check
 node --check frontend/webmcp-sdk.js && node --check frontend/storefront.js
 
-# Run ruff, ty, and codespell via agents-cli
+# Linting, type checks, and spellcheck (ruff, ty, codespell)
 agents-cli lint
 ```
 
-### Agent Behavior Evaluation (`agents-cli eval`)
-With valid Gemini credentials configured in `.env`:
+### Agent Evaluation (`agents-cli eval`)
+
+With Gemini credentials configured in `.env`:
+
 ```bash
-# Core 4-case WebMCP evaluation suite (discovery, cart+promo, safety block, confirmed checkout)
+# Core 4-case suite (discovery, cart+promo, safety block, confirmed checkout)
 agents-cli eval run
 
-# Held-out edge cases (out-of-stock handling & declarative HTML form actuation)
+# Held-out edge cases (out-of-stock fallback and declarative HTML form fill)
 agents-cli eval run --dataset tests/eval/datasets/holdout-dataset.json
 ```
 
 ---
 
-## Deployment, Observability & Evaluation Metrics
+## Deployment and Observability
 
-Deployed on **Google Cloud Agent Runtime** (`us-central1`, `google-adk`, telemetry enabled).
+Deployed on **Google Cloud Agent Runtime** (`us-central1`, `google-adk`, OpenTelemetry enabled).
 
-### Observed Metrics
+### Observed Results
 
-| Suite / Source | Metric | Observed Result |
+| Source | Metric | Result |
 |---|---|---|
-| `tests/unit` | Store, guardrails & WS RPC | `7 passed` |
-| `tests/integration` | `test_agent_stream`, `/run_sse`, A2A & agent card | `4 passed` |
+| `tests/unit` | Store, guardrails, WS RPC | `7 passed` |
+| `tests/integration` | `test_agent_stream`, `/run_sse`, A2A | `4 passed` |
 | `basic-dataset.json` (4 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
 | `holdout-dataset.json` (2 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
 | GCP Agent Runtime (Overview) | Sessions / Avg turns / Invocations | `1` · `1` · `4` |
 | GCP Agent Runtime (Latency) | P95 agent latency / P95 tool latency | `28s` · `0.01s` (`5` tool calls) |
 | GCP Agent Runtime (Tokens) | Input tokens / Output tokens | `15,761` · `1,970` |
-| GCP Agent Runtime (Revisions) | Active revisions / Traffic split | `1 of 1` (`100%` on revision `1`) |
+| GCP Agent Runtime (Revisions) | Active revisions / Traffic | `1 of 1` (`100%` on revision `1`) |
 
 ### GCP Console Screenshots
 
@@ -416,12 +423,12 @@ Deployed on **Google Cloud Agent Runtime** (`us-central1`, `google-adk`, telemet
 
 ![GCP Tool Metrics](docs/assets/gcp-tools-metrics.png)
 
-#### Token & Container Resource Usage (`Dashboard -> Usage`)
+#### Token and Container Usage (`Dashboard -> Usage`)
 Input/output token usage alongside container CPU and memory allocation.
 
 ![GCP Usage and Container Metrics](docs/assets/gcp-usage-metrics.png)
 
-#### Revisions & Traffic (`Revisions`)
+#### Revisions and Traffic (`Revisions`)
 `1 of 1` active revision (`runtimeRevisions/1`) serving `100%` traffic.
 
 ![GCP Revisions](docs/assets/gcp-revisions.png)
@@ -435,4 +442,4 @@ Container startup and `200 OK` responses on `/api/webmcp/status`, `/a2a/app/.wel
 
 ## License
 
-Licensed under the **Apache License 2.0**. See the license headers in [`app/`](app/agent.py) for details.
+Apache License 2.0. See the license headers in [`app/agent.py`](app/agent.py).
