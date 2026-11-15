@@ -44,6 +44,8 @@ This repository pairs **WebMCP** with **Google ADK** inside a sample e-commerce 
 | **Safety checks** | Prompt-only instructions | Deterministic `before_tool_callback` guardrails in Python |
 | **Testability** | Slow headless browser runs | Synchronized state store for `pytest` and `agents-cli eval` |
 
+![Why WebMCP Beats DOM Scraping](docs/assets/webmcp-vs-dom-scraping.gif)
+
 ---
 
 ## Architecture
@@ -251,27 +253,27 @@ Other launch options:
 ## Walkthrough
 
 ### 1. Search and add to cart
-Prompt: `"Hi i want to order 7 keyboards"` — runs `search_products`, `get_cart`, and `add_to_cart` over WebSocket, updating **Cart (7)** (`$1,323.00`).
+Prompt: `"Search for audio products under $250 and add 1 AeroPulse Pro ANC Headphones to my cart."` — runs `search_products`, `get_cart`, and `add_to_cart` over WebSocket, updating **Cart (1)** (`$249.00 USD`).
 
 ![Step 1: Search and cart addition](docs/assets/ui-step1-cart-add.jpg)
 
 ### 2. Declarative HTML form fill (`<form toolname="update_shipping_form">`)
-Providing shipping details invokes the declarative form tool directly, highlighting `<form>` and filling all fields.
+Providing shipping details (`sanket bisne`, `sanketbisne@gmail.com`, `Nagpur`) invokes the declarative form tool directly, highlighting `<form>` and filling all fields.
 
 ![Step 2: Declarative shipping form populated](docs/assets/ui-step2-declarative-form.jpg)
 
 ### 3. Checkout confirmation gate (`checkout_confirmation_guard`)
-`checkout_confirmation_guard` halts `checkout_order` and asks for explicit approval (`"Yes, I confirm"`).
+`checkout_confirmation_guard` halts `checkout_order` (`user_confirmed=false`) and asks for explicit approval (`"Yes, I confirm"`).
 
 ![Step 3: Checkout safety confirmation gate](docs/assets/ui-step3-safety-gate.jpg)
 
 ### 4. Confirmed order and receipt
-After confirmation, `checkout_order` executes in the browser, resets the cart to `Cart (0)`, shows a toast, and returns order ID `NXG-DF2A9F`.
+After confirmation, `checkout_order` executes in the browser, resets the cart to `Cart (0)`, and records order `NXG-489625` (`$249.00 USD`).
 
-![Step 4: Confirmed order and toast](docs/assets/ui-step4-order-confirmed.png)
+![Step 4: Order confirmed in chat](docs/assets/ui-step4-order-confirmed.png)
 
 ### 5. Completed orders in Cart tab
-The **Cart** tab displays the cleared cart alongside `Order NXG-DF2A9F Confirmed`.
+The **Cart** tab displays the cleared active cart (`Cart (0)`) alongside `Order NXG-489625 Confirmed` under **Completed Orders**.
 
 ![Step 5: Completed orders in Cart tab](docs/assets/ui-step5-cart-completed.png)
 
@@ -341,10 +343,13 @@ adk-webmcp-storefront/
 │   ├── storefront.js         # Imperative tool registrations, UI highlights, ADK chat client
 │   ├── index.html            # Storefront, WebMCP Inspector, and ADK Copilot UI
 │   └── styles.css            # Workspace styles and actuation highlights
-├── docs/assets/
-│   ├── webmcp-adk-banner.jpg # Architecture banner
-│   ├── ui-step*.png / .jpg   # Storefront, Inspector, and ADK Dev UI screenshots
-│   └── gcp-*.png / .jpg      # Google Cloud Agent Runtime metrics and log screenshots
+├── docs/
+│   ├── medium-blog-draft.md  # Full walkthrough & Agent Runtime write-up
+│   └── assets/
+│       ├── webmcp-adk-banner.jpg # Architecture banner
+│       ├── *.gif                 # DOM-vs-WebMCP and agents-cli pipeline diagrams
+│       ├── ui-step*.png / .jpg   # Storefront, Inspector, and ADK Dev UI screenshots
+│       └── gcp-*.png / .jpg      # Google Cloud Agent Runtime metrics and log screenshots
 ├── tests/
 │   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC tests
 │   ├── integration/          # ADK streaming and A2A server integration tests
@@ -366,7 +371,7 @@ adk-webmcp-storefront/
 uv run pytest tests/unit -v
 
 # Integration tests (ADK streaming and A2A endpoints)
-uv run pytest tests/integration -v
+uv run --env-file .env pytest tests/integration -v
 
 # Frontend syntax check
 node --check frontend/webmcp-sdk.js && node --check frontend/storefront.js
@@ -387,46 +392,66 @@ agents-cli eval run
 agents-cli eval run --dataset tests/eval/datasets/holdout-dataset.json
 ```
 
+![From Local Agent to Production with agents-cli](docs/assets/agents-cli-eval-deploy-pipeline.gif)
+
 ---
 
 ## Deployment and Observability
 
-Deployed on **Google Cloud Agent Runtime** (`us-central1`, `google-adk`, OpenTelemetry enabled).
+Deployed on **Google Cloud Agent Runtime** (`us-west1`, `google-adk`, OpenTelemetry enabled).
 
 ### Observed Results
 
 | Source | Metric | Result |
 |---|---|---|
 | `tests/unit` | Store, guardrails, WS RPC | `7 passed` |
-| `tests/integration` | `test_agent_stream`, `/run_sse`, A2A | `4 passed` |
+| `tests/integration` | `test_agent_stream`, `/run_sse`, A2A | `4 passed` (`uv run --env-file .env pytest`) |
 | `basic-dataset.json` (4 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
 | `holdout-dataset.json` (2 cases) | `custom_response_quality` / `webmcp_tool_used` | `5.0000 / 5.0` · `1.0000 / 1.0` |
-| GCP Agent Runtime (Overview) | Sessions / Avg turns / Invocations | `1` · `1` · `4` |
-| GCP Agent Runtime (Latency) | P95 agent latency / P95 tool latency | `28s` · `0.01s` (`5` tool calls) |
-| GCP Agent Runtime (Tokens) | Input tokens / Output tokens | `15,761` · `1,970` |
-| GCP Agent Runtime (Revisions) | Active revisions / Traffic | `1 of 1` (`100%` on revision `1`) |
+| GCP Agent Runtime (Overview) | Sessions / Avg turns / Invocations | `4` · `1.25` · `10` |
+| GCP Agent Runtime (Latency) | P95 agent / model / tool latency | `27.667s` · `6.912s` · `0.01s` (`13` model, `12` tool calls) |
+| GCP Agent Runtime (Tokens) | Input tokens / Output tokens | `41,483` · `3,911` |
+| GCP Agent Runtime (Container) | Peak CPU / Memory allocation | `0.404s` · `1.212GiB` |
+| GCP Agent Runtime (Revisions) | Active revisions / Traffic | `1 of 1` (`100%` on `runtimeRevisions/1`) |
 
 ### GCP Console Screenshots
 
 #### Agent Runtime Deployment (`Gemini Platform -> Deployments`)
-`webmcp-adk` running in `us-central1 (Iowa)` on `google-adk` with telemetry enabled.
+`webmcp-adk` running in `us-west1 (Oregon)` on `google-adk` with telemetry enabled.
 
 ![GCP Agent Runtime Deployment](docs/assets/gcp-deployments.png)
 
 #### Overview Metrics (`Dashboard -> Overview`)
-`1` session, `4` invocations, `28s` P95 latency, `15,761` input tokens, `1,970` output tokens.
+`4` sessions, `1.25` avg turns, `10` invocations, `27.667s` P95 latency, `41,483` input tokens, `3,911` output tokens.
 
 ![GCP Overview Metrics](docs/assets/gcp-overview-metrics.png)
 
+#### Model Telemetry (`Dashboard -> Models`)
+`13` model calls for `gemini-3.8-flash` in the 15-minute window at `6.912s` P95 model latency.
+
+![GCP Model Telemetry](docs/assets/gcp-models-metrics.png)
+
 #### Tool Telemetry (`Dashboard -> Tools`)
-`5` tool calls, `0.01s` P95 tool latency across `search_products`, `get_cart`, and `apply_promo_code`.
+`12` tool calls, `0.01s` P95 tool latency across all 7 WebMCP tools (`8.333%` error rate from deliberate `checkout_order` safety-gate test).
 
 ![GCP Tool Metrics](docs/assets/gcp-tools-metrics.png)
 
 #### Token and Container Usage (`Dashboard -> Usage`)
-Input/output token usage alongside container CPU and memory allocation.
+Input/output token usage alongside container CPU (`0.404s` peak) and memory (`1.212GiB` peak) allocation.
 
 ![GCP Usage and Container Metrics](docs/assets/gcp-usage-metrics.png)
+
+#### Production Trace Waterfall & Span Graph (`Traces`)
+Single `POST /run_sse` request (`19.741s`, `12` spans) across `invoke_workflow webmcp_agent`, `generate_content`, and WebMCP tools.
+
+![GCP Production Trace Waterfall](docs/assets/gcp-trace-waterfall.png)
+
+![GCP Production Trace Graph](docs/assets/gcp-trace-dag.png)
+
+#### Active Sessions (`Sessions`)
+Multi-turn ADK and A2A conversation threads (`demo-user`, `load-user-1`, `load-user-2`, A2A sessions).
+
+![GCP Active Sessions](docs/assets/gcp-sessions.png)
 
 #### Revisions and Traffic (`Revisions`)
 `1 of 1` active revision (`runtimeRevisions/1`) serving `100%` traffic.
@@ -434,7 +459,7 @@ Input/output token usage alongside container CPU and memory allocation.
 ![GCP Revisions](docs/assets/gcp-revisions.png)
 
 #### Cloud Logging (`Dashboard -> Logs`)
-Container startup and `200 OK` responses on `/api/webmcp/status`, `/a2a/app/.well-known/agent-card.json`, `/run_sse`, and `/a2a/app`.
+`200 OK` responses on `/api/webmcp/status`, `/a2a/app/.well-known/agent-card.json`, `/run_sse`, and `/a2a/app`.
 
 ![GCP Agent Logs](docs/assets/gcp-logs.jpg)
 
