@@ -38,11 +38,13 @@ This repository pairs **WebMCP** with **Google ADK** inside a sample e-commerce 
 
 | Capability | DOM / Screenshot Automation | WebMCP + Google ADK |
 |---|---|---|
-| **Tool discovery** | Fragile CSS selectors or ARIA parsing | Explicit JSON Schemas via `navigator.modelContext` and `<form toolname>` |
+| **Tool discovery** | Fragile CSS selectors or ARIA parsing | Explicit JSON Schemas via `navigator.modelContext` / `document.modelContext` and `<form toolname>` |
 | **UI execution** | Simulated clicks and keystrokes | Direct RPC calls into live page handlers |
 | **Form input** | Per-field focus and typing loops | Single-call declarative HTML form population |
 | **Safety checks** | Prompt-only instructions | Deterministic `before_tool_callback` guardrails in Python |
 | **Testability** | Slow headless browser runs | Synchronized state store for `pytest` and `agents-cli eval` |
+
+![Before vs. After WebMCP: Pixel Scraping Loops vs. Typed Browser Tool Contracts](docs/assets/before-vs-after-webmcp.gif)
 
 ![Why WebMCP Beats DOM Scraping](docs/assets/webmcp-vs-dom-scraping.gif)
 
@@ -106,7 +108,10 @@ sequenceDiagram
 
 ## WebMCP Surfaces
 
-[`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) polyfills `window.navigator.modelContext` (delegating to native browser support if available) and exposes two registration patterns.
+[`frontend/webmcp-sdk.js`](frontend/webmcp-sdk.js) adapts both native Chrome WebMCP (`document.modelContext` / `navigator.modelContext`) and the local `window.__webmcpContext` shim for fallback environments, exposing two registration patterns and full Chrome 160+ `Tool` interface compatibility:
+
+- **Chrome 160+ `Tool` compatibility (`readToolAttributes`)**: Safely reads `tool.source ?? tool.window` and nullable `inputSchema`, `outputSchema`, and `annotations` properties without spreading or cloning native browser `Tool` objects.
+- **Unified registration lookup**: [`frontend/storefront.js`](frontend/storefront.js) resolves `window.__webmcpContext || window.navigator.modelContext || document.modelContext` to register 7 imperative storefront tools and 1 declarative `<form>` tool (`8` browser tools total, plus `list_webmcp_tools` on the ADK bridge).
 
 ### Imperative API (`navigator.modelContext.registerTool`)
 
@@ -198,8 +203,8 @@ Promo codes:
 [`app/guardrails.py`](app/guardrails.py) registers an ordered callback chain on `root_agent`:
 
 1. `record_turn_context` (`before_agent_callback`): stores `latest_user_message` and `webmcp_session_id` in ADK session state.
-2. `input_validation_guard` (`before_tool_callback`): rejects `<script>`, `javascript:`, and inline event handlers (`onerror=`, `onload=`, `onclick=`) in string arguments, and bounds `add_to_cart` quantity to `1–10`.
-3. `checkout_confirmation_guard` (`before_tool_callback`): blocks `checkout_order` unless `args["user_confirmed"] is True` and `has_explicit_confirmation(user_text)` matches affirmative approval without negation terms (`"do not"`, `"cancel"`, `"wait"`).
+2. `input_validation_guard` (`before_tool_callback`): rejects `<script>`, `javascript:`, and inline event handlers (`onerror=`, `onload=`, `onclick=`, `onmouseover=`) in string arguments, and bounds `add_to_cart` quantity to `1–10`.
+3. `checkout_confirmation_guard` (`before_tool_callback`): blocks `checkout_order` unless **both** `args["user_confirmed"] is True` and `has_explicit_confirmation(user_text)` matches affirmative approval without negation terms (`"do not"`, `"don't"`, `"never"`, `"cancel"`, `"stop"`, `"abort"`, `"wait"`).
 
 ---
 
@@ -346,10 +351,11 @@ adk-webmcp-storefront/
 ├── docs/
 │   ├── medium-blog-draft.md  # Full walkthrough & Agent Runtime write-up
 │   └── assets/
-│       ├── webmcp-adk-banner.jpg # Architecture banner
-│       ├── *.gif                 # DOM-vs-WebMCP and agents-cli pipeline diagrams
-│       ├── ui-step*.png / .jpg   # Storefront, Inspector, and ADK Dev UI screenshots
-│       └── gcp-*.png / .jpg      # Google Cloud Agent Runtime metrics and log screenshots
+│       ├── webmcp-adk-banner.jpg         # Architecture banner
+│       ├── before-vs-after-webmcp.gif    # Animated Before vs. After WebMCP comparison
+│       ├── *.gif                         # DOM-vs-WebMCP and agents-cli pipeline diagrams
+│       ├── ui-step*.png / .jpg           # Storefront, Inspector, and ADK Dev UI screenshots
+│       └── gcp-*.png / .jpg              # Google Cloud Agent Runtime metrics and log screenshots
 ├── tests/
 │   ├── unit/test_webmcp.py   # Store, guardrail, HTTP, and WebSocket RPC tests
 │   ├── integration/          # ADK streaming and A2A server integration tests
@@ -398,7 +404,7 @@ agents-cli eval run --dataset tests/eval/datasets/holdout-dataset.json
 
 ## Deployment and Observability
 
-Deployed on **Google Cloud Agent Runtime** (`us-west1`, `google-adk`, OpenTelemetry enabled).
+Tested and benchmarked on **Google Cloud Agent Runtime** (`us-west1`, `google-adk`, OpenTelemetry enabled; ephemeral test deployment was subsequently torn down via `agents-cli deploy` cleanup—redeploy anytime with `agents-cli deploy`).
 
 ### Observed Results
 
