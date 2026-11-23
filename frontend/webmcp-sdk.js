@@ -10,9 +10,9 @@
   "use strict";
 
   const nativeContext =
-    typeof navigator !== "undefined" && navigator.modelContext
-      ? navigator.modelContext
-      : null;
+    (typeof document !== "undefined" && document.modelContext) ||
+    (typeof navigator !== "undefined" && navigator.modelContext) ||
+    null;
 
   const toolRegistry = new Map();
   let ws = null;
@@ -21,6 +21,28 @@
 
   function emitActivity(detail) {
     window.dispatchEvent(new CustomEvent("webmcp:activity", { detail }));
+  }
+
+  /**
+   * Chrome 160+ (PR #348) Tool interface compatibility helper:
+   * - `tool.window` was renamed to `tool.source`
+   * - `inputSchema`, `outputSchema`, and `annotations` default to `null`
+   * - Never use JSON.stringify(tool), {...tool}, or structuredClone(tool) on Tool objects
+   */
+  function readToolAttributes(tool) {
+    if (!tool) return null;
+    const source = tool.source ?? tool.window ?? null;
+    const { name, title, description, origin } = tool;
+    return {
+      name,
+      title: title ?? null,
+      description: description || "",
+      origin: origin ?? null,
+      inputSchema: tool.inputSchema ?? null,
+      outputSchema: tool.outputSchema ?? null,
+      annotations: tool.annotations ?? null,
+      source,
+    };
   }
 
   function serializeTools() {
@@ -32,8 +54,9 @@
           ? `HTML <form toolname="${entry.name}">`
           : "navigator.modelContext.registerTool",
       description: entry.description || "",
-      inputSchema: entry.inputSchema || { type: "object", properties: {} },
-      annotations: entry.annotations || {},
+      inputSchema: entry.inputSchema ?? { type: "object", properties: {} },
+      outputSchema: entry.outputSchema ?? null,
+      annotations: entry.annotations ?? null,
     }));
   }
 
@@ -65,16 +88,33 @@
       }
       toolRegistry.set(toolDef.name, {
         name: toolDef.name,
+        title: toolDef.title ?? null,
         source: toolDef._declarative ? "declarative" : "imperative",
         description: toolDef.description || "",
-        inputSchema: toolDef.inputSchema || { type: "object", properties: {} },
-        annotations: toolDef.annotations || {},
+        inputSchema: toolDef.inputSchema ?? { type: "object", properties: {} },
+        outputSchema: toolDef.outputSchema ?? null,
+        annotations: toolDef.annotations ?? null,
         execute: toolDef.execute,
       });
 
       if (nativeContext && typeof nativeContext.registerTool === "function") {
         try {
-          nativeContext.registerTool(toolDef);
+          const nativeDef = {
+            name: toolDef.name,
+            description: toolDef.description || "",
+            inputSchema: toolDef.inputSchema ?? { type: "object", properties: {} },
+            execute: toolDef.execute,
+          };
+          if (toolDef.title !== undefined && toolDef.title !== null) {
+            nativeDef.title = toolDef.title;
+          }
+          if (toolDef.outputSchema !== undefined && toolDef.outputSchema !== null) {
+            nativeDef.outputSchema = toolDef.outputSchema;
+          }
+          if (toolDef.annotations !== undefined && toolDef.annotations !== null) {
+            nativeDef.annotations = toolDef.annotations;
+          }
+          nativeContext.registerTool(nativeDef);
         } catch (_) {
           // Ignore duplicate registration on native experimental surface
         }
@@ -110,6 +150,18 @@
         } catch (_) {}
       }
       pushToolsToBridge();
+    },
+
+    async getTools() {
+      if (nativeContext && typeof nativeContext.getTools === "function") {
+        try {
+          const nativeTools = await nativeContext.getTools();
+          return Array.from(nativeTools, (t) => readToolAttributes(t)).filter(Boolean);
+        } catch (_) {
+          // Fall through to local registry
+        }
+      }
+      return serializeTools();
     },
 
     getRegisteredTools() {
@@ -165,13 +217,32 @@
         );
       }
     },
+    readToolAttributes,
   };
 
-  Object.defineProperty(window.navigator, "modelContext", {
-    value: modelContextShim,
-    configurable: true,
-    enumerable: true,
-  });
+  window.__webmcpContext = modelContextShim;
+
+  try {
+    Object.defineProperty(window.navigator, "modelContext", {
+      value: modelContextShim,
+      configurable: true,
+      enumerable: true,
+    });
+  } catch (_) {
+    // Chrome 160+ may expose a non-configurable native ModelContext instance
+  }
+
+  if (typeof document !== "undefined" && !document.modelContext) {
+    try {
+      Object.defineProperty(document, "modelContext", {
+        value: modelContextShim,
+        configurable: true,
+        enumerable: true,
+      });
+    } catch (_) {
+      // Ignore if document.modelContext is already locked by the browser
+    }
+  }
 
   /**
    * Declarative WebMCP HTML Form Scanner
@@ -231,7 +302,7 @@
         `Declarative HTML form tool (${toolName})`;
       const inputSchema = extractFormSchema(formEl);
 
-      window.navigator.modelContext.registerTool({
+      modelContextShim.registerTool({
         name: toolName,
         description,
         inputSchema,
@@ -312,7 +383,7 @@
           new CustomEvent("webmcp:snapshot", { detail: msg.snapshot })
         );
       } else if (msg.type === "webmcp:call_tool") {
-        const result = await window.navigator.modelContext.invokeLocalTool(
+        const result = await modelContextShim.invokeLocalTool(
           msg.tool,
           msg.args,
           {

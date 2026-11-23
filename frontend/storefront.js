@@ -320,7 +320,10 @@
    * Register Imperative WebMCP Tools via navigator.modelContext.registerTool(...)
    */
   function registerImperativeWebMcpTools() {
-    const mc = window.navigator.modelContext;
+    const mc =
+      window.__webmcpContext ||
+      window.navigator.modelContext ||
+      document.modelContext;
 
     mc.registerTool({
       name: "search_products",
